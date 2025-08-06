@@ -3,6 +3,24 @@ use rusqlite::{Connection, OpenFlags};
 use std::fs;
 use toml_edit::DocumentMut;
 
+pub struct Header {
+    pub rowid: usize,
+    pub session_id: Option<usize>,
+    pub name: String,
+    pub timestamp: String,
+}
+
+impl Header {
+    pub fn from(rowid: usize, session_id: Option<usize>, name: String, timestamp: String) -> Self {
+        Header {
+            rowid,
+            session_id,
+            name,
+            timestamp,
+        }
+    }
+}
+
 pub struct Model {
     pub conn: Connection,               // sqlite connection having all data needed
     pub layer: DocumentMut,             // layer datas
@@ -33,15 +51,20 @@ impl Model {
         })
     }
 
-    pub fn query_protos(&self) -> Result<Vec<(usize, String)>> {
+    pub fn query_protos(&self) -> Result<Vec<Header>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT rowid, proto FROM tcp_proto_messages")?;
-        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            .prepare("SELECT rowid, session, proto, timestamp FROM tcp_proto_messages")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(Header::from(
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+            ))
+        })?;
 
-        Ok(rows
-            .filter_map(Result::ok)
-            .collect::<Vec<(usize, String)>>())
+        Ok(rows.filter_map(Result::ok).collect::<Vec<Header>>())
     }
 
     pub fn query_data(&self, proto_id: &usize) -> Result<String> {

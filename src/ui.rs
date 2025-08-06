@@ -11,15 +11,17 @@ use ratatui::{
     Frame,
 };
 
-use crate::component::{EditingInput, InputArena};
 use crate::{
     app::{AppState, CurrentScreen},
-    component::MainInput,
+    component::{EditingInput, InputArena, MainInput},
+    model::Header,
 };
 
 const FOCUSED_TEXT_COLOR: Color = Color::Green;
 const UNFOCUSED_TEXT_COLOR: Color = Color::DarkGray;
 
+const HEADER_COLOR_FG: Color = tailwind::SLATE.c200;
+const HEADER_COLOR_BG: Color = tailwind::SLATE.c900;
 const SELECTED_ROW_STYLE_FG: Color = tailwind::SLATE.c400;
 const SELECTED_CELL_STYLE_FG: Color = tailwind::SLATE.c600;
 const NORMAL_ROW_COLOR: Color = tailwind::SLATE.c950;
@@ -85,7 +87,9 @@ fn build_search_proto_name(input: &InputArena, screen: &CurrentScreen) -> Result
     .block(search_block))
 }
 
-fn build_list_protos<'a>(protos: &[&String]) -> Table<'a> {
+fn build_table<'a>(protos: &[&Header]) -> Table<'a> {
+    let header_style = Style::default().fg(HEADER_COLOR_FG).bg(HEADER_COLOR_BG);
+
     let selected_row_style = Style::default()
         .add_modifier(Modifier::REVERSED)
         .fg(SELECTED_ROW_STYLE_FG);
@@ -94,21 +98,43 @@ fn build_list_protos<'a>(protos: &[&String]) -> Table<'a> {
         .add_modifier(Modifier::REVERSED)
         .fg(SELECTED_CELL_STYLE_FG);
 
+    let header = ["Name", "Session", "Timestamp"]
+        .into_iter()
+        .map(Cell::from)
+        .collect::<Row>()
+        .style(header_style)
+        .height(1);
+
     let rows = protos.iter().map(|item| {
-        let cell = Cell::from(Text::from(item.to_string()));
-        Row::new([cell])
-            .style(Style::new().fg(ROW_FG).bg(NORMAL_ROW_COLOR))
-            .height(1)
+        Row::new([
+            Cell::from(Text::from(item.name.to_string())),
+            Cell::from(Text::from(if let Some(si) = item.session_id {
+                si.to_string()
+            } else {
+                String::from("None")
+            })),
+            Cell::from(Text::from(item.timestamp.to_string())),
+        ])
+        .style(Style::new().fg(ROW_FG).bg(NORMAL_ROW_COLOR))
+        .height(1)
     });
 
     let bar = " █ ";
 
-    Table::new(rows, [Constraint::Min(10)])
-        .row_highlight_style(selected_row_style)
-        .cell_highlight_style(selected_cell_style)
-        .highlight_symbol(Text::from(bar))
-        .highlight_spacing(ratatui::widgets::HighlightSpacing::Always)
-        .bg(BUFFER_BG)
+    Table::new(
+        rows,
+        [
+            Constraint::Min(10),
+            Constraint::Min(10),
+            Constraint::Min(10),
+        ],
+    )
+    .header(header)
+    .row_highlight_style(selected_row_style)
+    .cell_highlight_style(selected_cell_style)
+    .highlight_symbol(Text::from(bar))
+    .highlight_spacing(ratatui::widgets::HighlightSpacing::Always)
+    .bg(BUFFER_BG)
 }
 
 fn build_scrollbar<'a>() -> Scrollbar<'a> {
@@ -214,8 +240,8 @@ fn render_main_screen(frame: &mut Frame, state: &mut AppState, input: &InputAren
 
     let title = build_title();
     let search = build_search_proto_name(input, &state.current_screen)?;
-    let names: Vec<&String> = state.get_filtered_data()?;
-    let list = build_list_protos(&names);
+    let headers: Vec<&Header> = state.get_filtered_data()?;
+    let list = build_table(&headers);
     let scrollbar = build_scrollbar();
 
     let text = if let Some((_, cached_data)) = &state.cached {

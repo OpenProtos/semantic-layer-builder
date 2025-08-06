@@ -5,7 +5,7 @@ use ratatui::{
 };
 
 use crate::component::{EditingInput, InputArena, MainInput};
-use crate::model::Model;
+use crate::model::{Header, Model};
 
 const ITEM_HEIGHT: usize = 4;
 pub enum CurrentScreen {
@@ -15,7 +15,7 @@ pub enum CurrentScreen {
 }
 
 pub struct AppState {
-    pub items: Vec<(usize, String)>, // list of all item names found in the SQLite DB
+    pub items: Vec<Header>, // list of all item names found in the SQLite DB
     pub cached: Option<(usize, String)>, // cached value for the UI
     pub selected_index: usize, // current state of the TableState, can be derived from state but used to simplified processes
 
@@ -60,7 +60,7 @@ impl AppState {
                 .items
                 .iter()
                 .enumerate()
-                .filter(|(_, (_, name))| self.matches_filter(name, filter_value))
+                .filter(|(_, h)| self.matches_filter(&h.name, filter_value))
                 .map(|(i, _)| i)
                 .collect();
 
@@ -70,12 +70,11 @@ impl AppState {
         Ok(())
     }
 
-    pub fn get_filtered_data(&self) -> Result<Vec<&String>> {
+    pub fn get_filtered_data(&self) -> Result<Vec<&Header>> {
         Ok(self
             .filtered_indexes
             .iter()
             .filter_map(|i| self.items.get(*i))
-            .map(|(_, s)| s)
             .collect())
     }
 
@@ -93,12 +92,12 @@ impl AppState {
                 .context(format!("Cannot find item from index {0}", real_index))?;
 
             if let Some((cached_index, _)) = &self.cached {
-                if item.0 == *cached_index {
+                if item.rowid == *cached_index {
                     return Ok(());
                 }
             }
 
-            self.cached = Some((item.0, model.query_data(&item.0)?));
+            self.cached = Some((item.rowid, model.query_data(&item.rowid)?));
         }
         Ok(())
     }
